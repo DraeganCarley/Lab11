@@ -1,0 +1,220 @@
+top.v
+
+module top(
+    input btnC,
+    input btnU,
+    output [6:0] led
+    );
+    
+    // Ripple counter
+    // Outputs to LED 0, 1, and 2
+
+    ripple_counter RC0(
+        .clk(btnC),
+        .reset(btnU),
+        .Q(led[2:0])
+    );
+
+    // Modulo counter
+    // Count state to LED 3, 4, and 5
+    // Divided output to LED 6
+
+    modulo_counter MC0(
+        .clk(btnC),
+        .reset(btnU),
+        .Q(led[5:3]),
+        .clk_out(led[6])
+    );
+endmodule
+
+d_flipflop.v
+
+module d_flipflop(
+    input D,
+    input clk,
+    input reset,
+    output reg Q
+    );
+    
+        initial begin
+        Q = 1'b0;
+    end
+
+    always @(posedge clk or posedge reset)
+    begin
+        if (reset)
+            Q <= 1'b0;
+        else
+            Q <= D;
+    end
+
+endmodule
+
+t_flipflop.v
+
+module t_flipflop(
+    input T,
+    input clk,
+    input reset,
+    output Q
+    );
+    
+    wire D;
+
+    xor (D, T, Q);
+
+    d_flipflop DFF0(
+        .D(D),
+        .clk(clk),
+        .reset(reset),
+        .Q(Q)
+    );
+endmodule
+
+
+full_adder.v
+
+module full_adder(
+    input A,
+    input B,
+    input Cin,
+    output Sum,
+    output Cout
+    );
+    
+    wire xor1;
+    wire and1;
+    wire and2;
+
+    xor (xor1, A, B);
+    xor (Sum, xor1, Cin);
+
+    and (and1, A, B);
+    and (and2, xor1, Cin);
+
+    or (Cout, and1, and2);
+    
+endmodule
+
+ripple_counter.v
+
+module ripple_counter(
+    input clk,
+    input reset,
+    output [2:0] Q
+    );
+    
+    wire clk1;
+    wire clk2;
+
+    not (clk1, Q[0]);
+    not (clk2, Q[1]);
+
+    t_flipflop TFF0(
+        .T(1'b1),
+        .clk(clk),
+        .reset(reset),
+        .Q(Q[0])
+    );
+
+    t_flipflop TFF1(
+        .T(1'b1),
+        .clk(clk1),
+        .reset(reset),
+        .Q(Q[1])
+    );
+
+    t_flipflop TFF2(
+        .T(1'b1),
+        .clk(clk2),
+        .reset(reset),
+        .Q(Q[2])
+    );
+endmodule
+
+modulo_counter.v
+
+module modulo_counter(
+    input clk,
+    input reset,
+    output [2:0] Q,
+    output clk_out
+    );
+    
+    wire [2:0] sum;
+    wire [2:0] next_count;
+    wire [2:0] carry;
+
+    wire at_count;
+    wire next_out;
+
+    // Add 1 to the current count
+
+    full_adder FA0(
+        .A(Q[0]),
+        .B(1'b0),
+        .Cin(1'b1),
+        .Sum(sum[0]),
+        .Cout(carry[0])
+    );
+
+    full_adder FA1(
+        .A(Q[1]),
+        .B(1'b0),
+        .Cin(carry[0]),
+        .Sum(sum[1]),
+        .Cout(carry[1])
+    );
+
+    full_adder FA2(
+        .A(Q[2]),
+        .B(1'b0),
+        .Cin(carry[1]),
+        .Sum(sum[2]),
+        .Cout(carry[2])
+    );
+
+    // Detect count = 5 (binary 101)
+
+    and (at_count, Q[2], ~Q[1], Q[0]);
+
+    // Return to 000 after reaching 101
+
+    and (next_count[0], sum[0], ~at_count);
+    and (next_count[1], sum[1], ~at_count);
+    and (next_count[2], sum[2], ~at_count);
+
+    // Store the three counter bits
+
+    d_flipflop DFF0(
+        .D(next_count[0]),
+        .clk(clk),
+        .reset(reset),
+        .Q(Q[0])
+    );
+
+    d_flipflop DFF1(
+        .D(next_count[1]),
+        .clk(clk),
+        .reset(reset),
+        .Q(Q[1])
+    );
+
+    d_flipflop DFF2(
+        .D(next_count[2]),
+        .clk(clk),
+        .reset(reset),
+        .Q(Q[2])
+    );
+
+    // Toggle output every 6 clock pulses
+
+    xor (next_out, clk_out, at_count);
+
+    d_flipflop DFF_OUT(
+        .D(next_out),
+        .clk(clk),
+        .reset(reset),
+        .Q(clk_out)
+    );
+endmodule
