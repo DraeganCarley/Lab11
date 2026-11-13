@@ -103,12 +103,6 @@ module ripple_counter(
     input reset,
     output [2:0] Q
     );
-    
-    wire clk1;
-    wire clk2;
-
-    not (clk1, Q[0]);
-    not (clk2, Q[1]);
 
     t_flipflop TFF0(
         .T(1'b1),
